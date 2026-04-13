@@ -1,0 +1,22 @@
+# Project DUME — Docker Compose
+# Basic service definition for convenience.
+#
+# Usage:
+#   docker compose up --build          Run a detection cycle
+#   docker compose run dume --help     Show CLI options
+#
+# To enable host visibility, uncomment the privileged and volumes sections
+# below and rebuild.  This is NOT enabled by default for safety.
+
+services:
+  dume:
+    build: .
+    container_name: project-dume
+    command: ["python", "main.py", "--run-once", "--verbose"]
+
+    # ── Uncomment below for host kernel / log visibility ─────────
+    # privileged: true
+    # volumes:
+    #   - /proc:/host/proc:ro
+    #   - /sys:/host/sys:ro
+    #   - /var/log:/host/log:ro
