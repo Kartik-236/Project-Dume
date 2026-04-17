@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project DUME — Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="navbar">
+    <span class="brand">Project DUME</span>
+    <nav>
+        <a href="/" class="active">Dashboard</a>
+        <a href="/baseline">Baseline</a>
+        <a href="/runs">Runs</a>
+        <a href="/alerts">Alerts</a>
+        <a href="/findings">Findings</a>
+        <a href="/reports">Reports</a>
+        <a href="/health">Health</a>
+    </nav>
+</header>
+<div class="container">
+    <h1 class="page-title">Dashboard</h1>
+    <p class="subtitle">Secure Kernel Linux Hardening Against Rootkits and Privilege Escalation</p>
+
+    <div id="dash-status" class="status-msg"></div>
+
+    <div class="btn-group">
+        <button class="btn btn-primary" onclick="dashRunBaseline()">Create / Update Baseline</button>
+        <button class="btn btn-primary" onclick="dashRunDetection()">Run Detection Cycle</button>
+    </div>
+
+    <div class="card-grid">
+        <div class="card">
+            <div class="label">Baseline Present</div>
+            <div class="value" id="baseline-status">--</div>
+        </div>
+        <div class="card">
+            <div class="label">Last Baseline</div>
+            <div class="value" id="baseline-ts" style="font-size:1rem">--</div>
+        </div>
+        <div class="card">
+            <div class="label">Last Scan Severity</div>
+            <div class="value" id="last-severity">--</div>
+        </div>
+        <div class="card">
+            <div class="label">Last Scan Score</div>
+            <div class="value" id="last-score">--</div>
+        </div>
+        <div class="card">
+            <div class="label">Last Scan Time</div>
+            <div class="value" id="last-scan-ts" style="font-size:1rem">--</div>
+        </div>
+        <div class="card">
+            <div class="label">Total Runs</div>
+            <div class="value" id="total-runs">--</div>
+        </div>
+        <div class="card">
+            <div class="label">Total Alerts</div>
+            <div class="value" id="total-alerts">--</div>
+        </div>
+        <div class="card">
+            <div class="label">Total Findings</div>
+            <div class="value" id="total-findings">--</div>
+        </div>
+        <div class="card">
+            <div class="label">Reports</div>
+            <div class="value" id="total-reports">--</div>
+        </div>
+    </div>
+</div>
+<script src="/static/app.js"></script>
+<script>loadDashboard();</script>
+</body>
+</html>

@@ -13,6 +13,17 @@ DB_PATH = os.path.join(_BASE_DIR, "storage", "events.db")
 BASELINE_PATH = os.path.join(_BASE_DIR, "baseline", "baseline.json")
 REPORT_OUTPUT_DIR = os.path.join(_BASE_DIR, "reporting", "output")
 
+# ── Database backend ─────────────────────────────────────────────────────
+# Set DATABASE_BACKEND=postgres to use PostgreSQL, otherwise falls back to sqlite
+DATABASE_BACKEND = os.environ.get("DATABASE_BACKEND", "sqlite").lower()
+
+# PostgreSQL connection (used when DATABASE_BACKEND=postgres)
+PGHOST = os.environ.get("PGHOST", "localhost")
+PGPORT = int(os.environ.get("PGPORT", "5432"))
+PGDATABASE = os.environ.get("PGDATABASE", "dume")
+PGUSER = os.environ.get("PGUSER", "dume")
+PGPASSWORD = os.environ.get("PGPASSWORD", "dume")
+
 # ── Collector limits ─────────────────────────────────────────────────────
 DMESG_LINE_LIMIT = 200
 JOURNAL_LINE_LIMIT = 200
@@ -65,10 +76,13 @@ SCORE_BINARY_HASH_DRIFT = 25
 SCORE_SUSPICIOUS_PRIV = 15
 SCORE_SUSPICIOUS_CMD = 10
 SCORE_SUSPICIOUS_PATH_MODULE = 20
+SCORE_DELETED_EXE = 25
+SCORE_SUSPICIOUS_CAPS = 15
 
 # Correlation bonus scores
 CORRELATION_PRIV_PLUS_MODULE = 15
 CORRELATION_SYSCTL_PLUS_CMD = 10
+CORRELATION_DELETED_PLUS_PRIV = 20
 
 # Severity tiers (cumulative score thresholds)
 SEVERITY_THRESHOLDS: dict[str, int] = {

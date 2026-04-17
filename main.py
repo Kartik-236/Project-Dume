@@ -1,43 +1,22 @@
 """
-Project DUME — Main Pipeline Orchestrator
+Project DUME — Main Pipeline Orchestrator (Phase 2)
+
+CLI interface preserved from Phase 1.
+Now uses services.pipeline_service internally for shared logic.
 
 Usage:
     python main.py --init-baseline          Create / update trusted baseline
     python main.py --run-once               Run one full detection cycle
-    python main.py --run-once --verbose      … with debug-level output
+    python main.py --run-once --verbose      ... with debug-level output
     python main.py --show-alerts            Print recent alerts from DB
 """
 
 import argparse
 import logging
-import sys
-from typing import Any
 
 import config
-from baseline.baseline_manager import (
-    compare_current_to_baseline,
-    create_baseline,
-    load_baseline,
-)
-from collectors.audit_collector import collect_audit_events
-from collectors.dmesg_collector import collect_dmesg_events
-from collectors.journal_collector import collect_journal_events
-from collectors.proc_collector import collect_process_events
-from correlation.correlator import correlate
-from detection.integrity_detector import analyse as integrity_analyse
-from detection.privilege_detector import analyse as privilege_analyse
-from normalization.normalizer import normalize_events
-from reporting.reporter import (
-    generate_incident_summary,
-    print_alert_to_console,
-    save_alert_json,
-)
-from storage.event_store import (
-    fetch_recent_alerts,
-    init_db,
-    save_alert,
-    save_events,
-)
+from services.pipeline_service import run_baseline, run_detection_cycle
+from storage.event_store import fetch_recent_alerts, init_db
 
 log = logging.getLogger("dume")
 
@@ -47,7 +26,7 @@ log = logging.getLogger("dume")
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="project-dume",
-        description="Project DUME — Kernel-Aware Host Security Framework",
+        description="Project DUME -- Kernel-Aware Host Security Framework",
     )
     p.add_argument("--init-baseline", action="store_true",
                    help="Create or update the trusted baseline snapshot")
@@ -63,85 +42,55 @@ def build_parser() -> argparse.ArgumentParser:
 # ── Pipeline steps ───────────────────────────────────────────────────────
 
 def do_init_baseline() -> None:
-    print("[*] Creating / updating baseline …")
-    bl = create_baseline()
-    mods = len(bl.get("kernel_modules", []))
-    sysctls = len(bl.get("sysctls", {}))
-    bins = sum(1 for v in bl.get("binary_hashes", {}).values() if v)
-    print(f"[+] Baseline saved: {mods} modules, {sysctls} sysctls, {bins} binary hashes")
-    print(f"    Path: {config.BASELINE_PATH}")
+    print("[*] Creating / updating baseline ...")
+    result = run_baseline()
+    print(f"[+] {result['message']}")
+    print(f"    Path: {result['path']}")
 
 
 def do_run_once() -> None:
-    # 1. Database
-    init_db(config.DB_PATH)
+    init_db()
 
-    # 2. Baseline
-    baseline = load_baseline()
-    if baseline is None:
-        print("[!] No baseline found. Creating one now …")
-        print("    Re-run with --run-once after baseline is established for")
-        print("    meaningful drift detection.")
-        create_baseline()
-        baseline = load_baseline()
+    print("[*] Collecting telemetry ...")
+    result = run_detection_cycle()
 
-    # 3. Collect telemetry
-    print("[*] Collecting telemetry …")
-    raw_events: list[dict[str, Any]] = []
-    raw_events.extend(collect_process_events())
-    raw_events.extend(collect_dmesg_events())
-    raw_events.extend(collect_journal_events())
-    raw_events.extend(collect_audit_events())
+    print(f"    Raw events collected: {result['raw_events_count']}")
+    print(f"    Normalized events  : {result['normalized_events_count']}")
 
-    print(f"    Raw events collected: {len(raw_events)}")
-
-    # 4. Normalize
-    normalized = normalize_events(raw_events)
-    print(f"    Normalized events  : {len(normalized)}")
-
-    # 5. Persist events
-    saved = save_events(config.DB_PATH, normalized)
-    log.debug("Saved %d events to DB", saved)
-
-    # 6. Baseline comparison
-    print("[*] Comparing against baseline …")
-    drift = compare_current_to_baseline(baseline)
+    drift = result['integrity_findings_count']
+    print(f"[*] Comparing against baseline ...")
     if drift:
-        print(f"    Baseline drift items: {len(drift)}")
+        print(f"    Integrity findings : {drift}")
     else:
         print("    No baseline drift detected.")
 
-    # 7. Detection
-    print("[*] Running detectors …")
-    integrity_findings = integrity_analyse(drift, normalized)
-    privilege_findings = privilege_analyse(normalized)
-    all_findings = integrity_findings + privilege_findings
-    print(f"    Integrity findings : {len(integrity_findings)}")
-    print(f"    Privilege findings : {len(privilege_findings)}")
+    print("[*] Running detectors ...")
+    print(f"    Integrity findings : {result['integrity_findings_count']}")
+    print(f"    Privilege findings : {result['privilege_findings_count']}")
+    print(f"    Total risk score   : {result['total_score']} ({result['severity']})")
 
-    # 8. Correlation
-    alert = correlate(all_findings)
-    score = alert["total_score"]
-    severity = alert["severity"]
-    print(f"    Total risk score   : {score} ({severity})")
-
-    # 9. Alert / report
-    if score >= config.ALERT_THRESHOLD:
+    if result.get('alert_saved'):
+        from reporting.reporter import print_alert_to_console, generate_incident_summary
+        # Reconstruct minimal alert for console display
+        alert = {
+            "severity": result["severity"],
+            "total_score": result["total_score"],
+            "timestamp": result["timestamp"],
+            "summary": result["summary"],
+            "recommended_action": result["recommended_action"],
+            "findings": result.get("findings", []),
+        }
         print_alert_to_console(alert)
-        save_alert(config.DB_PATH, alert)
-        path = save_alert_json(alert)
-        print(f"[+] Alert persisted to DB and saved to {path}")
-        summary = generate_incident_summary(alert)
-        log.debug("Incident summary:\n%s", summary)
+        print(f"[+] Alert persisted to DB and saved to {result.get('report_path')}")
     else:
-        print("[+] Score below alert threshold — system looks nominal.")
+        print("[+] Score below alert threshold -- system looks nominal.")
 
     print("[*] Detection cycle complete.")
 
 
 def do_show_alerts() -> None:
-    init_db(config.DB_PATH)
-    alerts = fetch_recent_alerts(config.DB_PATH, limit=10)
+    init_db()
+    alerts = fetch_recent_alerts(limit=10)
     if not alerts:
         print("[i] No alerts stored yet.")
         return
@@ -149,8 +98,7 @@ def do_show_alerts() -> None:
         sev = a.get("severity", "?").upper()
         score = a.get("total_score", 0)
         ts = a.get("timestamp", "?")
-        n = len(a.get("findings", []))
-        print(f"  {i}. [{sev}] score={score}  findings={n}  time={ts}")
+        print(f"  {i}. [{sev}] score={score}  time={ts}")
         print(f"     {a.get('summary', '')[:120]}")
 
 

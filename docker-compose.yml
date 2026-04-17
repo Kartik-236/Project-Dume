@@ -1,22 +1,52 @@
-# Project DUME — Docker Compose
-# Basic service definition for convenience.
+# Project DUME — Docker Compose (Phase 2)
 #
 # Usage:
-#   docker compose up --build          Run a detection cycle
-#   docker compose run dume --help     Show CLI options
+#   docker compose up --build          Start app + postgres
+#   docker compose down                Stop all services
+#   docker compose logs -f app         Tail app logs
 #
-# To enable host visibility, uncomment the privileged and volumes sections
-# below and rebuild.  This is NOT enabled by default for safety.
+# Dashboard: http://localhost:8000
+# API:       http://localhost:8000/api/status
 
 services:
-  dume:
+  postgres:
+    image: postgres:16-alpine
+    container_name: dume-postgres
+    environment:
+      POSTGRES_DB: dume
+      POSTGRES_USER: dume
+      POSTGRES_PASSWORD: dume
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dume"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
     build: .
-    container_name: project-dume
-    command: ["python", "main.py", "--run-once", "--verbose"]
+    container_name: dume-app
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_BACKEND: postgres
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: dume
+      PGUSER: dume
+      PGPASSWORD: dume
+    depends_on:
+      postgres:
+        condition: service_healthy
 
     # ── Uncomment below for host kernel / log visibility ─────────
+    # NOTE: not enabled by default for safety
     # privileged: true
     # volumes:
     #   - /proc:/host/proc:ro
     #   - /sys:/host/sys:ro
     #   - /var/log:/host/log:ro
+
+volumes:
+  pgdata:

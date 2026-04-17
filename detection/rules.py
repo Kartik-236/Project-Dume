@@ -1,5 +1,5 @@
 """
-Project DUME — Detection Rules (Centralized)
+Project DUME — Detection Rules (Centralized, Phase 2)
 Suspicious indicators, scoring constants, and shared helpers used by detectors.
 """
 
@@ -26,13 +26,21 @@ SCORE_BINARY_HASH_DRIFT = config.SCORE_BINARY_HASH_DRIFT
 SCORE_SUSPICIOUS_PRIV = config.SCORE_SUSPICIOUS_PRIV
 SCORE_SUSPICIOUS_CMD = config.SCORE_SUSPICIOUS_CMD
 SCORE_SUSPICIOUS_PATH_MODULE = config.SCORE_SUSPICIOUS_PATH_MODULE
+SCORE_DELETED_EXE = config.SCORE_DELETED_EXE
+SCORE_SUSPICIOUS_CAPS = config.SCORE_SUSPICIOUS_CAPS
 
 # ── Suspicious module-name heuristics ────────────────────────────────────
-# Short names, randomised-looking strings, known rootkit module names
 SUSPICIOUS_MODULE_NAMES: list[str] = [
     "diamorphine", "reptile", "suterusu", "bdvl",
-    "hideproc", "rootkit", "lime",
+    "hideproc", "rootkit", "lime", "kovid",
+    "adore", "knark", "azazel", "jynx", "beurk",
 ]
+
+# ── Dangerous capabilities (hex bitmask positions don't matter here, ───
+#    we check for CapEff == full bitmask which means all caps granted)
+# A CapEff of 000001ffffffffff (or similar full-set value) on a non-root-
+# owned process is suspicious.
+FULL_CAP_THRESHOLD = 0x000001ffffffffff  # common full-cap value
 
 
 def score_to_severity(score: int) -> str:
@@ -64,3 +72,14 @@ def is_suspicious_path(path: str) -> bool:
     """Check whether a path starts with a known-suspicious directory."""
     p = path.lower()
     return any(p.startswith(sp) for sp in SUSPICIOUS_PATHS)
+
+
+def has_full_capabilities(capeff: str | None) -> bool:
+    """Check if a CapEff hex string indicates full (all) capabilities."""
+    if not capeff:
+        return False
+    try:
+        val = int(capeff, 16)
+        return val >= FULL_CAP_THRESHOLD
+    except ValueError:
+        return False

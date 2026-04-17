@@ -1,5 +1,5 @@
 """
-Project DUME — Integrity Detector
+Project DUME — Integrity Detector (Phase 2)
 Detects kernel integrity drift by analysing baseline comparison results
 and module-related telemetry events.
 """
@@ -16,12 +16,7 @@ def analyse(
     baseline_drift: list[dict[str, Any]],
     normalized_events: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Run integrity checks and return a list of findings.
-
-    Args:
-        baseline_drift: output of baseline_manager.compare_current_to_baseline()
-        normalized_events: optional normalized telemetry (used for module-load heuristics)
-    """
+    """Run integrity checks and return a list of findings."""
     findings: list[dict[str, Any]] = []
 
     # ── Baseline drift findings ──────────────────────────────────────
@@ -32,7 +27,6 @@ def analyse(
             mod = d.get("key", "")
             score = rules.SCORE_NEW_MODULE
             severity = "medium"
-            # Bump score if name matches known-suspicious modules
             if mod.lower() in [s.lower() for s in rules.SUSPICIOUS_MODULE_NAMES]:
                 score += 20
                 severity = "high"
@@ -76,8 +70,9 @@ def analyse(
         for ev in normalized_events:
             msg = (ev.get("message") or "").lower()
             source = ev.get("source", "")
+            metadata = ev.get("metadata", {})
 
-            # Detect module loads from suspicious paths (dmesg / journal)
+            # Module loads from suspicious paths (dmesg / journal)
             if source in ("dmesg", "journal"):
                 if any(kw in msg for kw in ("insmod", "modprobe", "module")):
                     if rules.is_suspicious_path(msg):
@@ -88,6 +83,25 @@ def analyse(
                             description=f"Module load from suspicious path detected in {source}",
                             evidence={"message": ev.get("message", "")[:500]},
                         ))
+
+            # Deleted-running privileged executable (cross-domain)
+            if source == "proc" and metadata.get("exe_deleted"):
+                euid = ev.get("euid")
+                if euid == 0:
+                    findings.append(rules.make_finding(
+                        finding_type="deleted_privileged_exe",
+                        severity="critical",
+                        score=rules.SCORE_DELETED_EXE,
+                        description=(
+                            f"Root-privileged process '{ev.get('process_name')}' "
+                            f"(pid={ev.get('pid')}) running from deleted executable"
+                        ),
+                        evidence={
+                            "pid": ev.get("pid"),
+                            "exe_path": metadata.get("exe_path"),
+                            "euid": euid,
+                        },
+                    ))
 
     log.info("Integrity detector produced %d findings", len(findings))
     return findings

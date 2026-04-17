@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project DUME — Health</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="navbar">
+    <span class="brand">Project DUME</span>
+    <nav>
+        <a href="/">Dashboard</a>
+        <a href="/baseline">Baseline</a>
+        <a href="/runs">Runs</a>
+        <a href="/alerts">Alerts</a>
+        <a href="/findings">Findings</a>
+        <a href="/reports">Reports</a>
+        <a href="/health" class="active">Health</a>
+    </nav>
+</header>
+<div class="container">
+    <h1 class="page-title">System Health</h1>
+    <div id="health-status" class="status-msg"></div>
+    <div class="card" style="padding:0">
+        <div id="health-list"><div class="health-item">Loading health checks...</div></div>
+    </div>
+</div>
+<script src="/static/app.js"></script>
+<script>loadHealth();</script>
+</body>
+</html>

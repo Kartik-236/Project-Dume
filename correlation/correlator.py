@@ -1,5 +1,5 @@
 """
-Project DUME — Event Correlator / Risk Scorer
+Project DUME — Event Correlator / Risk Scorer (Phase 2)
 Merges findings from all detectors, applies correlation bonuses,
 and assigns an overall severity tier.
 """
@@ -15,11 +15,7 @@ log = logging.getLogger("dume.correlation")
 
 
 def correlate(findings: list[dict[str, Any]]) -> dict[str, Any]:
-    """Correlate a set of detector findings into a single scored alert.
-
-    Returns a dict with:
-        timestamp, total_score, severity, findings, summary, recommended_action
-    """
+    """Correlate a set of detector findings into a single scored alert."""
     if not findings:
         return _build_result(0, findings, "No findings in this cycle.")
 
@@ -28,22 +24,31 @@ def correlate(findings: list[dict[str, Any]]) -> dict[str, Any]:
     # ── Correlation bonuses ──────────────────────────────────────────
     types = {f.get("finding_type", "") for f in findings}
 
-    priv_types = {"abnormal_root_euid", "suspicious_command", "suspicious_cmdline_path"}
-    module_types = {"new_kernel_module", "suspicious_module_path", "missing_kernel_module"}
+    priv_types = {"abnormal_root_euid", "suspicious_command",
+                  "suspicious_cmdline_path", "suspicious_capabilities"}
+    module_types = {"new_kernel_module", "suspicious_module_path",
+                    "missing_kernel_module"}
+    deleted_types = {"deleted_running_exe", "deleted_privileged_exe"}
 
     has_priv = bool(types & priv_types)
     has_module = bool(types & module_types)
     has_sysctl = "sysctl_drift" in types
+    has_deleted = bool(types & deleted_types)
 
     if has_priv and has_module:
         total += config.CORRELATION_PRIV_PLUS_MODULE
-        log.info("Correlation bonus: privilege + module findings (+%d)",
+        log.info("Correlation bonus: privilege + module (+%d)",
                  config.CORRELATION_PRIV_PLUS_MODULE)
 
     if has_sysctl and has_priv:
         total += config.CORRELATION_SYSCTL_PLUS_CMD
-        log.info("Correlation bonus: sysctl drift + privilege findings (+%d)",
+        log.info("Correlation bonus: sysctl drift + privilege (+%d)",
                  config.CORRELATION_SYSCTL_PLUS_CMD)
+
+    if has_deleted and has_priv:
+        total += config.CORRELATION_DELETED_PLUS_PRIV
+        log.info("Correlation bonus: deleted exe + privilege (+%d)",
+                 config.CORRELATION_DELETED_PLUS_PRIV)
 
     summary_parts = [f"{f['finding_type']}: {f['description']}" for f in findings[:5]]
     summary = "; ".join(summary_parts)

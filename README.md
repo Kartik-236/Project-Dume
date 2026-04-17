@@ -2,9 +2,9 @@
 
 **Secure Kernel Linux Hardening Against Rootkits and Privilege Escalation**
 
-A lightweight, modular, kernel-aware host security framework for Linux that creates trusted baselines, collects runtime telemetry, detects suspicious kernel integrity drift and privilege escalation, and generates risk-scored alerts.
+A lightweight, modular, kernel-aware host security framework for Linux that creates trusted baselines, collects runtime telemetry, detects suspicious kernel integrity drift and privilege escalation, and generates risk-scored alerts with a web dashboard.
 
-> **Status:** Academic MVP / seminar-capstone prototype — not a production EDR.
+> **Phase 2** — Working model for testing, experiments, and research.
 
 ---
 
@@ -12,12 +12,13 @@ A lightweight, modular, kernel-aware host security framework for Linux that crea
 
 ```
 Trusted Baseline Creation
-  → Continuous Telemetry Collection
-    → Event Normalization
-      → Kernel Integrity & Privilege Analysis
-        → Risk Scoring & Event Correlation
-          → Alert Generation
-            → Evidence Logging & Reporting
+  -> Continuous Telemetry Collection
+    -> Event Normalization
+      -> Kernel Integrity & Privilege Analysis
+        -> Risk Scoring & Event Correlation
+          -> Alert Generation
+            -> Evidence Logging & Reporting
+              -> Web Dashboard
 ```
 
 ## Repository Structure
@@ -25,16 +26,17 @@ Trusted Baseline Creation
 ```
 project-dume/
 ├── main.py                     CLI pipeline orchestrator
+├── app.py                      FastAPI web application
 ├── config.py                   Central configuration
-├── Dockerfile                  Linux container for execution
-├── docker-compose.yml          Optional Compose service
-├── requirements.txt            Python dependencies (psutil only)
+├── Dockerfile                  Linux container (web mode)
+├── docker-compose.yml          App + PostgreSQL services
+├── requirements.txt            Python dependencies
 │
 ├── baseline/
 │   └── baseline_manager.py     Kernel module / sysctl / binary baselines
 │
 ├── collectors/
-│   ├── proc_collector.py       Process enumeration (psutil)
+│   ├── proc_collector.py       Process enumeration + deleted-exe + caps
 │   ├── dmesg_collector.py      Kernel ring buffer
 │   ├── journal_collector.py    systemd journal
 │   ├── audit_collector.py      /var/log/audit/audit.log parser
@@ -54,100 +56,142 @@ project-dume/
 ├── reporting/
 │   └── reporter.py             Console, JSON, and summary output
 │
+├── services/
+│   ├── pipeline_service.py     Shared pipeline logic (CLI + web)
+│   ├── baseline_service.py     Baseline summary
+│   ├── detection_service.py    Run/alert/finding queries
+│   ├── report_service.py       Report file listing
+│   └── health_service.py       System health checks
+│
 ├── storage/
-│   └── event_store.py          SQLite persistence (events & alerts)
+│   ├── db.py                   DB abstraction (PostgreSQL + SQLite)
+│   └── event_store.py          Runs, events, alerts, findings tables
+│
+├── web/
+│   └── api_routes.py           FastAPI API endpoints
+│
+├── frontend/                   Static dashboard pages
+│   ├── index.html              Dashboard
+│   ├── baseline.html           Baseline detail
+│   ├── runs.html               Run history
+│   ├── alerts.html             Alert list
+│   ├── findings.html           Finding list
+│   ├── reports.html            JSON report list
+│   ├── health.html             System health
+│   ├── style.css               Dark theme
+│   └── app.js                  API fetch logic
+│
+├── scripts/
+│   ├── run_kali.sh             Kali launcher (web/cli/status/stop/logs)
+│   └── stop_kali.sh            Quick stop
 │
 └── docs/
-    ├── synopsis.md             Brief project summary
-    └── architecture.md         Module overview & data flow
+    ├── synopsis.md
+    └── architecture.md
 ```
 
-## Quick Start
-
-### Prerequisites
-
-- Python 3.10+
-- Linux (Kali, Ubuntu, Debian, etc.) for full functionality
-- Docker (optional, for containerised execution)
-
-### Run Locally on Linux
+## Kali Quick Start
 
 ```bash
-# Install dependencies
+# Make scripts executable
+chmod +x scripts/*.sh
+
+# Start web mode (Docker Compose with PostgreSQL)
+./scripts/run_kali.sh web
+
+# Check status
+./scripts/run_kali.sh status
+
+# View logs
+./scripts/run_kali.sh logs
+
+# Stop services
+./scripts/run_kali.sh stop
+
+# CLI sanity check
+./scripts/run_kali.sh cli
+```
+
+## CLI Usage (Local Linux)
+
+```bash
 pip install -r requirements.txt
 
-# Create a trusted baseline snapshot
 python main.py --init-baseline --verbose
-
-# Run one detection cycle
 python main.py --run-once --verbose
-
-# View stored alerts
 python main.py --show-alerts
 ```
 
-### Run in Docker
+## Web Mode (Local)
 
 ```bash
-# Build the image
-docker build -t project-dume .
+pip install -r requirements.txt
 
-# Basic run (container-scoped telemetry only)
-docker run --rm project-dume
+# SQLite fallback (no PostgreSQL needed)
+uvicorn app:app --host 0.0.0.0 --port 8000
 
-# With host kernel visibility (requires elevated access)
-docker run --rm --privileged \
-    -v /proc:/host/proc:ro \
-    -v /var/log:/host/log:ro \
-    project-dume
+# Visit http://localhost:8000
 ```
 
-Or with Docker Compose:
+## Docker Compose
 
 ```bash
-docker compose up --build
+docker compose up --build        # Start app + postgres
+docker compose down              # Stop
+docker compose logs -f app       # Tail logs
 ```
 
-### CLI Reference
+Dashboard: http://localhost:8000
 
-| Flag | Description |
-|---|---|
-| `--init-baseline` | Create or update the trusted baseline snapshot |
-| `--run-once` | Execute a single detection cycle |
-| `--show-alerts` | Display recent alerts from the database |
-| `--verbose` / `-v` | Enable debug-level logging |
+## Database
 
-Flags can be combined: `python main.py --init-baseline --run-once --verbose`
+| Mode | Backend | Config |
+|---|---|---|
+| Docker Compose | PostgreSQL | `DATABASE_BACKEND=postgres` (default in compose) |
+| Local / standalone | SQLite | `DATABASE_BACKEND=sqlite` (default) |
+
+To force SQLite in any environment: `export DATABASE_BACKEND=sqlite`
+
+## Phase 2 Detection Capabilities
+
+**Kernel Integrity (rootkit-adjacent):**
+- Baseline module drift (new / missing modules)
+- Suspicious module names (diamorphine, reptile, etc.)
+- Module load from suspicious paths (/tmp, /dev/shm, /home)
+- sysctl weakening / drift
+- Binary hash drift
+- Deleted-but-running privileged executables
+
+**Privilege Escalation:**
+- Abnormal euid==0 (with expanded system allowlist)
+- Suspicious sudo / pkexec / insmod / modprobe usage
+- Suspicious command-line paths
+- Full capability set detection (CapEff)
+- Deleted-running executables
+
+**Correlation:**
+- Privilege + module activity bonus
+- sysctl drift + suspicious command bonus
+- Deleted-exe + privilege indicator bonus
 
 ## Limitations
 
-- **Docker:** Without `--privileged` and bind mounts, collectors only see container-level data. The pipeline still runs gracefully with partial results.
-- **Windows development:** The project targets Linux. On Windows, syntax and import checks pass but telemetry collectors return empty datasets.
-- **Audit log:** Requires `auditd` to be running and `/var/log/audit/audit.log` to be readable. Many Docker images lack this.
-- **eBPF:** Stub only in MVP — no eBPF probes are attached.
-- **Not a full EDR:** This is a focused academic prototype, not a comprehensive endpoint detection and response system.
+- Without `--privileged` Docker mode, collectors see container-scoped data only
+- eBPF is stub-only in this phase
+- Does NOT detect deep kernel memory rootkits or syscall hook tampering
+- Not a production EDR — academic research prototype
 
-## MVP Scope
+## Testing Suggestions (safe lab)
 
-- ✅ Trusted baseline (kernel modules, sysctls, binary hashes)
-- ✅ Multi-source telemetry (proc, dmesg, journalctl, audit)
-- ✅ Common event schema normalisation
-- ✅ Kernel integrity drift detection
-- ✅ Privilege escalation detection
-- ✅ Weighted risk scoring with correlation bonuses
-- ✅ SQLite event and alert persistence
-- ✅ Console and JSON alert reporting
-- ✅ Dockerised execution
+```bash
+# After starting web mode, trigger detections:
+curl -X POST http://localhost:8000/api/run-baseline
+curl -X POST http://localhost:8000/api/run-detection
 
-## Future Scope
-
-- Live eBPF kernel probes for real-time module loading / execve visibility
-- Continuous daemon mode with configurable scan intervals
-- YARA rule integration for in-memory module scanning
-- Network telemetry collection
-- Web dashboard for alert review
-- Integration with SIEM / syslog forwarding
-- Automated response actions (quarantine, module unload)
+# On Kali, simulate detectable behaviors:
+sudo ls                          # triggers sudo detection
+sudo modprobe dummy              # module + privilege correlation
+```
 
 ## License
 

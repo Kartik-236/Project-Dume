@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project DUME — Baseline</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="navbar">
+    <span class="brand">Project DUME</span>
+    <nav>
+        <a href="/">Dashboard</a>
+        <a href="/baseline" class="active">Baseline</a>
+        <a href="/runs">Runs</a>
+        <a href="/alerts">Alerts</a>
+        <a href="/findings">Findings</a>
+        <a href="/reports">Reports</a>
+        <a href="/health">Health</a>
+    </nav>
+</header>
+<div class="container">
+    <h1 class="page-title">Baseline</h1>
+    <div id="bl-status" class="status-msg"></div>
+    <div class="btn-group">
+        <button class="btn btn-primary" onclick="dashRunBaseline()">Create / Update Baseline</button>
+    </div>
+    <div class="card-grid">
+        <div class="card"><div class="label">Exists</div><div class="value" id="bl-exists">--</div></div>
+        <div class="card"><div class="label">Timestamp</div><div class="value" id="bl-ts" style="font-size:1rem">--</div></div>
+        <div class="card"><div class="label">Modules</div><div class="value" id="bl-modules">--</div></div>
+        <div class="card"><div class="label">Sysctls</div><div class="value" id="bl-sysctls">--</div></div>
+        <div class="card"><div class="label">Binary Hashes</div><div class="value" id="bl-hashes">--</div></div>
+    </div>
+    <div class="detail-block">
+        <h3 style="margin-bottom:0.5rem;color:var(--text-secondary)">Baseline Detail</h3>
+        <pre id="bl-detail">Load baseline to see detail...</pre>
+    </div>
+</div>
+<script src="/static/app.js"></script>
+<script>loadBaseline();</script>
+</body>
+</html>

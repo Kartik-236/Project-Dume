@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project DUME — Reports</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="navbar">
+    <span class="brand">Project DUME</span>
+    <nav>
+        <a href="/">Dashboard</a>
+        <a href="/baseline">Baseline</a>
+        <a href="/runs">Runs</a>
+        <a href="/alerts">Alerts</a>
+        <a href="/findings">Findings</a>
+        <a href="/reports" class="active">Reports</a>
+        <a href="/health">Health</a>
+    </nav>
+</header>
+<div class="container">
+    <h1 class="page-title">Reports</h1>
+    <div id="reports-status" class="status-msg"></div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr>
+                <th>Filename</th><th>Modified</th><th>Size</th>
+            </tr></thead>
+            <tbody id="reports-body"><tr><td colspan="3" style="text-align:center">Loading...</td></tr></tbody>
+        </table>
+    </div>
+</div>
+<script src="/static/app.js"></script>
+<script>loadReports();</script>
+</body>
+</html>

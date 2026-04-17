@@ -28,3 +28,6 @@ Thumbs.db
 *.log
 reporting/output/
 baseline/baseline.json
+
+# Docker
+pgdata/
